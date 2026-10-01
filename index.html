@@ -331,11 +331,11 @@
         <div class="row">
           <div class="field">
             <label for="employer">Nome / Razão social *</label>
-            <input id="employer" placeholder="Ex.: Empresa Exemplo Ltda." />
+            <input id="employer" placeholder="Ex.: Empresa Exemplo Ltda." value="51.377.255 DIEGO DOS SANTOS VIEIRA" />
           </div>
           <div class="field">
             <label for="employerDoc">CNPJ / CPF</label>
-            <input id="employerDoc" placeholder="00.000.000/0000-00" />
+            <input id="employerDoc" placeholder="00.000.000/0000-00" value="51.377.255/0001-09" />
           </div>
         </div>
 
@@ -724,7 +724,7 @@
       if(!raw) return;
       const d=JSON.parse(raw);
       for(const k of ['employer','employerDoc','employee','employeeCpf','role','reference','paymentDate','gross','notes']){
-        if(d[k] != null && els[k]) els[k].value=d[k];
+        if(d[k] != null && els[k] && (d[k] !== '' || !els[k].defaultValue)) els[k].value=d[k];
       }
       els.discounts.innerHTML='';
       if(Array.isArray(d.discounts) && d.discounts.length){
@@ -736,7 +736,7 @@
 
   function resetAll(){
     if(!confirm('Deseja limpar todos os dados do comprovante?')) return;
-    ['employer','employerDoc','employee','employeeCpf','role','reference','paymentDate','gross','notes'].forEach(k=>els[k].value='');
+    ['employer','employerDoc','employee','employeeCpf','role','reference','paymentDate','gross','notes'].forEach(k=>els[k].value=els[k].defaultValue);
     els.discounts.innerHTML='';
     addDiscount();
     clearSignature();
