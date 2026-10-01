@@ -263,6 +263,19 @@
       color:#94a3b8;
       text-align:center;
     }
+    .attach-input{display:none}
+    .attach-list{display:grid;gap:8px;margin:10px 0}
+    .attach-item{
+      display:flex;align-items:center;gap:10px;
+      padding:8px 10px;border:1px solid var(--line);border-radius:12px;background:#fbfdff;
+    }
+    .attach-item img{width:44px;height:44px;object-fit:cover;border-radius:8px;flex:none}
+    .attach-item span{flex:1;min-width:0;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .receipt-attachments{margin-top:28px;padding-top:16px;border-top:1px dashed #cbd5e1}
+    .receipt-attachments h3{margin:0 0 12px;font-size:14px;text-transform:uppercase;letter-spacing:.05em}
+    .receipt-attachments figure{margin:0 0 14px;text-align:center}
+    .receipt-attachments img{max-width:100%;max-height:900px;border:1px solid #dfe6ef;border-radius:8px}
+    .receipt-attachments figcaption{margin-top:4px;font-size:11px;color:var(--muted)}
     .empty{color:#94a3b8;font-style:italic;font-weight:500!important}
     .status{
       margin-top:10px;
@@ -299,6 +312,9 @@
       .preview{position:static}
       .card.preview{border:0;box-shadow:none;padding:0}
       .receipt{border:0;border-radius:0;min-height:auto;padding:0}
+      .receipt-attachments{break-before:page;border-top:0;margin-top:0;padding-top:0}
+      .receipt-attachments figure{break-inside:avoid}
+      .receipt-attachments img{max-height:250mm}
       @page{size:A4;margin:14mm}
     }
   </style>
@@ -331,11 +347,11 @@
         <div class="row">
           <div class="field">
             <label for="employer">Nome / Razão social *</label>
-            <input id="employer" placeholder="Ex.: Empresa Exemplo Ltda." />
+            <input id="employer" placeholder="Ex.: Empresa Exemplo Ltda." value="51.377.255 DIEGO DOS SANTOS VIEIRA" />
           </div>
           <div class="field">
             <label for="employerDoc">CNPJ / CPF</label>
-            <input id="employerDoc" placeholder="00.000.000/0000-00" />
+            <input id="employerDoc" placeholder="00.000.000/0000-00" value="51.377.255/0001-09" />
           </div>
         </div>
 
@@ -401,6 +417,12 @@
           <textarea id="notes" placeholder="Ex.: adiantamento, faltas, vale, ajuste, etc."></textarea>
         </div>
 
+        <div class="section-title">Comprovante de pagamento (anexo)</div>
+        <input id="attachInput" class="attach-input" type="file" accept="image/*,application/pdf" multiple />
+        <div id="attachList" class="attach-list"></div>
+        <button class="btn-secondary" type="button" id="attachBtn">+ Anexar comprovante</button>
+        <p class="hint">Foto, print ou PDF do PIX/transferência. O anexo sai junto no comprovante impresso.</p>
+
         <div class="section-title">Assinatura do funcionário</div>
         <div class="signature-shell">
           <canvas id="signaturePad"></canvas>
@@ -410,11 +432,11 @@
           <button class="btn-ghost" type="button" id="clearSignature">Limpar assinatura</button>
         </div>
 
+        <p class="hint" id="autosaveHint">Os dados e os anexos são salvos automaticamente neste aparelho. A assinatura não é salva.</p>
         <div id="status" class="status"></div>
 
         <div class="actions">
           <button class="btn-primary" type="button" id="printBtn">Gerar / Imprimir comprovante</button>
-          <button class="btn-ghost" type="button" id="saveBtn">Salvar dados neste aparelho</button>
           <button class="btn-danger" type="button" id="resetBtn">Limpar tudo</button>
         </div>
         <p class="hint">O botão “Gerar / Imprimir” permite salvar como PDF usando a opção de impressão do celular ou computador.</p>
@@ -487,6 +509,11 @@
               <strong id="signatureName">Assinatura do funcionário</strong><br/>
               <span id="signatureCpf"></span>
             </div>
+          </div>
+
+          <div class="receipt-attachments" id="pvAttachments" style="display:none">
+            <h3>Comprovante de pagamento anexo</h3>
+            <div id="pvAttachmentsList"></div>
           </div>
 
           <div class="receipt-footer">
@@ -629,6 +656,7 @@
     $('pvNotes').textContent=notes;
     $('signatureName').textContent=employee || 'Assinatura do funcionário';
     $('signatureCpf').textContent=els.employeeCpf.value.trim() ? `CPF: ${els.employeeCpf.value.trim()}` : '';
+    scheduleSave();
   }
 
   function resizeCanvas(){
@@ -708,15 +736,70 @@
     setTimeout(()=>els.status.classList.remove('show'),5000);
   }
 
+  let storageReady=false;
+  let saveTimer=null;
+  function scheduleSave(){
+    if(!storageReady) return;
+    clearTimeout(saveTimer);
+    saveTimer=setTimeout(saveLocal,400);
+  }
+  function flushSave(){
+    if(!storageReady || !saveTimer) return;
+    clearTimeout(saveTimer);
+    saveTimer=null;
+    saveLocal();
+  }
   function saveLocal(){
+    saveTimer=null;
     const data={
       employer:els.employer.value, employerDoc:els.employerDoc.value,
       employee:els.employee.value, employeeCpf:els.employeeCpf.value, role:els.role.value,
       reference:els.reference.value, paymentDate:els.paymentDate.value, gross:els.gross.value,
       notes:els.notes.value, discounts:getDiscounts()
     };
-    localStorage.setItem('salaryReceiptData',JSON.stringify(data));
-    showStatus('Dados salvos neste aparelho. A assinatura não é armazenada por segurança.','ok');
+    try{ localStorage.setItem('salaryReceiptData',JSON.stringify(data)); }catch(e){}
+  }
+
+  // Anexos ficam no IndexedDB (imagens podem passar do limite do localStorage)
+  function openDb(){
+    return new Promise((resolve,reject)=>{
+      const req=indexedDB.open('comprovanteSalario',1);
+      req.onupgradeneeded=()=>req.result.createObjectStore('kv');
+      req.onsuccess=()=>resolve(req.result);
+      req.onerror=()=>reject(req.error);
+    });
+  }
+  async function dbSet(key,value){
+    const db=await openDb();
+    await new Promise((resolve,reject)=>{
+      const tx=db.transaction('kv','readwrite');
+      tx.objectStore('kv').put(value,key);
+      tx.oncomplete=resolve;
+      tx.onerror=()=>reject(tx.error);
+    });
+    db.close();
+  }
+  async function dbGet(key){
+    const db=await openDb();
+    const value=await new Promise((resolve,reject)=>{
+      const req=db.transaction('kv').objectStore('kv').get(key);
+      req.onsuccess=()=>resolve(req.result);
+      req.onerror=()=>reject(req.error);
+    });
+    db.close();
+    return value;
+  }
+  function saveAttachments(){
+    if(!storageReady) return;
+    dbSet('attachments',attachments).catch(()=>{
+      showStatus('Não foi possível salvar os anexos neste aparelho (pouco espaço?).','err');
+    });
+  }
+  async function loadAttachments(){
+    try{
+      const saved=await dbGet('attachments');
+      if(Array.isArray(saved)) attachments=saved.concat(attachments);
+    }catch(e){}
   }
   function loadLocal(){
     try{
@@ -724,7 +807,7 @@
       if(!raw) return;
       const d=JSON.parse(raw);
       for(const k of ['employer','employerDoc','employee','employeeCpf','role','reference','paymentDate','gross','notes']){
-        if(d[k] != null && els[k]) els[k].value=d[k];
+        if(d[k] != null && els[k] && (d[k] !== '' || !els[k].defaultValue)) els[k].value=d[k];
       }
       els.discounts.innerHTML='';
       if(Array.isArray(d.discounts) && d.discounts.length){
@@ -734,12 +817,86 @@
     }catch(e){}
   }
 
+  let attachments=[];
+  let pdfjsPromise=null;
+  function loadPdfJs(){
+    if(!pdfjsPromise){
+      pdfjsPromise=new Promise((resolve,reject)=>{
+        const sc=document.createElement('script');
+        sc.src='vendor/pdfjs/pdf.min.js';
+        sc.onload=()=>{
+          window.pdfjsLib.GlobalWorkerOptions.workerSrc='vendor/pdfjs/pdf.worker.min.js';
+          resolve(window.pdfjsLib);
+        };
+        sc.onerror=()=>{pdfjsPromise=null;reject(new Error('pdf.js'));};
+        document.head.appendChild(sc);
+      });
+    }
+    return pdfjsPromise;
+  }
+  function readAsDataURL(file){
+    return new Promise((resolve,reject)=>{
+      const r=new FileReader();
+      r.onload=()=>resolve(r.result);
+      r.onerror=reject;
+      r.readAsDataURL(file);
+    });
+  }
+  async function pdfToImages(file){
+    const pdfjs=await loadPdfJs();
+    const pdf=await pdfjs.getDocument({data:await file.arrayBuffer()}).promise;
+    const pages=[];
+    for(let i=1;i<=pdf.numPages;i++){
+      const page=await pdf.getPage(i);
+      const viewport=page.getViewport({scale:2});
+      const c=document.createElement('canvas');
+      c.width=viewport.width;c.height=viewport.height;
+      await page.render({canvasContext:c.getContext('2d'),viewport}).promise;
+      pages.push(c.toDataURL('image/png'));
+    }
+    return pages;
+  }
+  async function addAttachments(files){
+    for(const file of files){
+      try{
+        if(file.type==='application/pdf'){
+          const pages=await pdfToImages(file);
+          pages.forEach((src,i)=>attachments.push({name:pages.length>1?`${file.name} (pág. ${i+1})`:file.name,src}));
+        }else if(file.type.startsWith('image/')){
+          attachments.push({name:file.name,src:await readAsDataURL(file)});
+        }else{
+          showStatus(`Formato não suportado: ${file.name}`,'err');
+        }
+      }catch(e){
+        showStatus(`Não foi possível ler ${file.name}. Tente enviar uma foto ou print.`,'err');
+      }
+    }
+    renderAttachments();
+  }
+  function renderAttachments(){
+    $('attachList').innerHTML=attachments.map((a,i)=>`
+      <div class="attach-item">
+        <img src="${a.src}" alt="" />
+        <span>${escapeHtml(a.name)}</span>
+        <button class="btn-ghost" type="button" data-remove="${i}">Remover</button>
+      </div>`).join('');
+    $('pvAttachmentsList').innerHTML=attachments.map(a=>`
+      <figure><img src="${a.src}" alt="" /><figcaption>${escapeHtml(a.name)}</figcaption></figure>`).join('');
+    $('pvAttachments').style.display=attachments.length?'block':'none';
+    saveAttachments();
+  }
+  function clearAttachments(){
+    attachments=[];
+    renderAttachments();
+  }
+
   function resetAll(){
     if(!confirm('Deseja limpar todos os dados do comprovante?')) return;
-    ['employer','employerDoc','employee','employeeCpf','role','reference','paymentDate','gross','notes'].forEach(k=>els[k].value='');
+    ['employer','employerDoc','employee','employeeCpf','role','reference','paymentDate','gross','notes'].forEach(k=>els[k].value=els[k].defaultValue);
     els.discounts.innerHTML='';
     addDiscount();
     clearSignature();
+    clearAttachments();
     localStorage.removeItem('salaryReceiptData');
     update();
   }
@@ -752,8 +909,19 @@
   els.gross.addEventListener('blur',()=>{formatInputMoney(els.gross);update();});
   $('addDiscount').addEventListener('click',()=>addDiscount());
   $('clearSignature').addEventListener('click',clearSignature);
-  $('saveBtn').addEventListener('click',saveLocal);
   $('resetBtn').addEventListener('click',resetAll);
+  $('attachBtn').addEventListener('click',()=>$('attachInput').click());
+  $('attachInput').addEventListener('change',async e=>{
+    const files=[...e.target.files];
+    e.target.value='';
+    await addAttachments(files);
+  });
+  $('attachList').addEventListener('click',e=>{
+    const btn=e.target.closest('[data-remove]');
+    if(!btn) return;
+    attachments.splice(Number(btn.dataset.remove),1);
+    renderAttachments();
+  });
   $('printBtn').addEventListener('click',()=>{
     syncSignatureImage();
     update();
@@ -780,6 +948,12 @@
   if(!els.discounts.children.length) addDiscount();
   update();
   requestAnimationFrame(resizeCanvas);
+  loadAttachments().finally(()=>{
+    storageReady=true;
+    renderAttachments();
+  });
+  window.addEventListener('pagehide',flushSave);
+  document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='hidden') flushSave(); });
 
   // PWA: instalação e funcionamento offline após o primeiro acesso via HTTPS
   let deferredInstallPrompt = null;
