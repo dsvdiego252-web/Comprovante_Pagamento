@@ -97,6 +97,8 @@
       box-shadow:0 0 0 3px rgba(29,78,216,.10);
     }
     textarea{min-height:86px;resize:vertical}
+    input[readonly]{background:#f1f5f9;color:#334155;cursor:default}
+    input[readonly]:focus{border-color:var(--line);box-shadow:none}
     .money-wrap{position:relative}
     .money-wrap span{
       position:absolute;left:13px;top:50%;transform:translateY(-50%);
@@ -381,11 +383,11 @@
         <div class="row">
           <div class="field">
             <label for="employer">Nome / Razão social *</label>
-            <input id="employer" placeholder="Ex.: Empresa Exemplo Ltda." value="51.377.255 DIEGO DOS SANTOS VIEIRA" />
+            <input id="employer" placeholder="Ex.: Empresa Exemplo Ltda." value="51.377.255 DIEGO DOS SANTOS VIEIRA" readonly tabindex="-1" />
           </div>
           <div class="field">
             <label for="employerDoc">CNPJ / CPF</label>
-            <input id="employerDoc" placeholder="00.000.000/0000-00" value="51.377.255/0001-09" />
+            <input id="employerDoc" placeholder="00.000.000/0000-00" value="51.377.255/0001-09" readonly tabindex="-1" />
           </div>
         </div>
 
@@ -811,6 +813,7 @@
   }
   function applyFormData(d, keepDefaults){
     for(const k of FIELDS){
+      if(els[k].readOnly) continue; // dados fixos do empregador
       if(d[k] != null && (!keepDefaults || d[k] !== '' || !els[k].defaultValue)) els[k].value=d[k];
     }
     els.discounts.innerHTML='';
