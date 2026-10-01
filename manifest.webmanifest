@@ -1,0 +1,22 @@
+{
+  "name": "Comprovante de Recebimento de Salário",
+  "short_name": "Comprovante",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f3f6fb",
+  "theme_color": "#0f172a",
+  "description": "Sistema para gerar comprovantes de recebimento de salário com assinatura na tela.",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

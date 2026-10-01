@@ -1,0 +1,20 @@
+COMPROVANTE DE SALÁRIO - VERSÃO PARA CELULAR / PWA
+
+Esta versão deve ser publicada como um site estático (HTTPS).
+Depois de publicada, abra o link no Chrome do celular e use:
+Menu do Chrome > Adicionar à tela inicial / Instalar app.
+
+Arquivos:
+- index.html
+- manifest.webmanifest
+- sw.js
+- icon-192.png
+- icon-512.png
+
+Depois do primeiro acesso pela internet, o app poderá continuar abrindo offline,
+desde que o navegador tenha concluído a instalação/cache.
+
+IMPORTANTE:
+Abrir index.html diretamente pela pasta Downloads (file://) não ativa o modo PWA
+nem o Service Worker. Para uso confiável no celular, publique a pasta em um host
+estático (Vercel, Netlify, GitHub Pages, Cloudflare Pages ou equivalente).

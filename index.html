@@ -1,0 +1,818 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#0f172a" />
+  <title>Comprovante de Recebimento de Salário</title>
+  <style>
+    :root{
+      --bg:#f3f6fb;
+      --card:#ffffff;
+      --text:#0f172a;
+      --muted:#64748b;
+      --line:#dbe3ee;
+      --primary:#1d4ed8;
+      --primary-dark:#1e40af;
+      --success:#047857;
+      --danger:#b91c1c;
+      --soft:#eef4ff;
+      --radius:18px;
+      --shadow:0 10px 30px rgba(15,23,42,.08);
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
+      background:var(--bg);
+      color:var(--text);
+    }
+    .app{
+      width:min(1100px,calc(100% - 24px));
+      margin:24px auto 48px;
+    }
+    .topbar{
+      display:flex;
+      justify-content:space-between;
+      align-items:flex-start;
+      gap:16px;
+      margin-bottom:18px;
+    }
+    h1{
+      margin:0;
+      font-size:clamp(24px,4vw,34px);
+      line-height:1.1;
+    }
+    .subtitle{
+      margin:8px 0 0;
+      color:var(--muted);
+      font-size:14px;
+    }
+    .grid{
+      display:grid;
+      grid-template-columns:minmax(0,1.05fr) minmax(0,.95fr);
+      gap:18px;
+    }
+    .card{
+      background:var(--card);
+      border:1px solid #e6ebf2;
+      border-radius:var(--radius);
+      box-shadow:var(--shadow);
+      padding:20px;
+    }
+    .card h2{
+      font-size:18px;
+      margin:0 0 16px;
+    }
+    .section-title{
+      font-size:13px;
+      text-transform:uppercase;
+      letter-spacing:.08em;
+      color:var(--muted);
+      margin:22px 0 10px;
+      font-weight:800;
+    }
+    .row{
+      display:grid;
+      grid-template-columns:repeat(2,minmax(0,1fr));
+      gap:12px;
+      margin-bottom:12px;
+    }
+    .row.three{grid-template-columns:repeat(3,minmax(0,1fr))}
+    .field{display:flex;flex-direction:column;gap:6px}
+    label{font-size:13px;font-weight:700;color:#334155}
+    input,textarea,select{
+      width:100%;
+      border:1px solid var(--line);
+      border-radius:12px;
+      padding:12px 13px;
+      font:inherit;
+      color:var(--text);
+      background:#fff;
+      outline:none;
+      transition:.15s ease;
+    }
+    input:focus,textarea:focus,select:focus{
+      border-color:#93b4ff;
+      box-shadow:0 0 0 3px rgba(29,78,216,.10);
+    }
+    textarea{min-height:86px;resize:vertical}
+    .money-wrap{position:relative}
+    .money-wrap span{
+      position:absolute;left:13px;top:50%;transform:translateY(-50%);
+      color:var(--muted);font-weight:700;
+    }
+    .money-wrap input{padding-left:38px}
+    .discounts{display:flex;flex-direction:column;gap:10px}
+    .discount-line{
+      display:grid;
+      grid-template-columns:minmax(0,1fr) 150px 42px;
+      gap:8px;
+      align-items:end;
+    }
+    button{
+      appearance:none;
+      border:0;
+      border-radius:12px;
+      padding:12px 16px;
+      font:inherit;
+      font-weight:800;
+      cursor:pointer;
+      transition:.15s ease;
+    }
+    button:active{transform:translateY(1px)}
+    .btn-primary{background:var(--primary);color:#fff}
+    .btn-primary:hover{background:var(--primary-dark)}
+    .btn-secondary{background:#e8eef9;color:#16346e}
+    .btn-danger{background:#fee2e2;color:var(--danger)}
+    .btn-ghost{background:#f8fafc;color:#334155;border:1px solid var(--line)}
+    .remove-btn{
+      height:45px;padding:0;display:grid;place-items:center;
+      background:#fff1f2;color:#be123c;font-size:18px;
+    }
+    .summary{
+      display:grid;
+      grid-template-columns:repeat(3,minmax(0,1fr));
+      gap:10px;
+      margin-top:14px;
+    }
+    .summary-box{
+      border:1px solid var(--line);
+      border-radius:14px;
+      padding:12px;
+      background:#fbfdff;
+    }
+    .summary-box small{display:block;color:var(--muted);margin-bottom:5px}
+    .summary-box strong{font-size:17px}
+    .summary-box.net{
+      background:#ecfdf5;border-color:#a7f3d0;
+    }
+    .summary-box.net strong{color:var(--success)}
+    .signature-shell{
+      border:1px dashed #94a3b8;
+      border-radius:14px;
+      overflow:hidden;
+      background:#fff;
+      touch-action:none;
+    }
+    #signaturePad{
+      display:block;
+      width:100%;
+      height:220px;
+      background:
+        linear-gradient(to bottom, transparent 82%, #cbd5e1 82%, #cbd5e1 83%, transparent 83%),
+        #fff;
+      touch-action:none;
+    }
+    .signature-actions{
+      display:flex;justify-content:space-between;gap:10px;margin-top:10px;
+    }
+    .hint{
+      font-size:12px;color:var(--muted);margin-top:8px;line-height:1.45;
+    }
+    .actions{
+      display:flex;flex-wrap:wrap;gap:10px;margin-top:18px;
+    }
+
+    /* Preview */
+    .preview{
+      position:sticky;
+      top:18px;
+    }
+    .receipt{
+      background:#fff;
+      border:1px solid #dfe6ef;
+      border-radius:16px;
+      padding:24px;
+      min-height:620px;
+    }
+    .receipt-header{
+      text-align:center;
+      padding-bottom:16px;
+      border-bottom:2px solid #0f172a;
+    }
+    .receipt-header h3{
+      margin:0 0 5px;
+      font-size:20px;
+      text-transform:uppercase;
+      letter-spacing:.03em;
+    }
+    .receipt-header p{margin:0;color:var(--muted);font-size:13px}
+    .receipt-meta{
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:10px;
+      margin-top:18px;
+    }
+    .receipt-item{
+      padding:10px 0;border-bottom:1px solid #eef2f7;
+    }
+    .receipt-item small{
+      color:var(--muted);display:block;font-size:11px;text-transform:uppercase;letter-spacing:.05em
+    }
+    .receipt-item strong{display:block;margin-top:3px;font-size:14px}
+    .statement{
+      margin:20px 0;
+      line-height:1.6;
+      font-size:14px;
+      text-align:justify;
+    }
+    .receipt-table{
+      width:100%;
+      border-collapse:collapse;
+      font-size:13px;
+      margin:14px 0;
+    }
+    .receipt-table th,.receipt-table td{
+      padding:9px 8px;border:1px solid #dfe6ef;text-align:left;
+    }
+    .receipt-table th{background:#f8fafc}
+    .receipt-table td:last-child,.receipt-table th:last-child{text-align:right}
+    .receipt-total{
+      margin-top:14px;
+      display:flex;justify-content:flex-end;
+    }
+    .receipt-total-box{
+      min-width:240px;
+      border:2px solid #0f172a;
+      padding:12px 14px;
+      border-radius:10px;
+      display:flex;justify-content:space-between;gap:15px;
+      font-weight:800;
+    }
+    .receipt-signature{
+      margin-top:42px;
+      text-align:center;
+    }
+    .receipt-signature img{
+      max-width:260px;
+      max-height:100px;
+      display:block;
+      margin:0 auto -5px;
+    }
+    .signature-line{
+      border-top:1px solid #0f172a;
+      width:min(320px,90%);
+      margin:0 auto;
+      padding-top:8px;
+      font-size:13px;
+    }
+    .receipt-footer{
+      margin-top:24px;
+      font-size:10px;
+      color:#94a3b8;
+      text-align:center;
+    }
+    .empty{color:#94a3b8;font-style:italic;font-weight:500!important}
+    .status{
+      margin-top:10px;
+      padding:10px 12px;
+      border-radius:10px;
+      font-size:13px;
+      display:none;
+    }
+    .status.show{display:block}
+    .status.ok{background:#ecfdf5;color:#065f46;border:1px solid #a7f3d0}
+    .status.err{background:#fff1f2;color:#9f1239;border:1px solid #fecdd3}
+
+    @media (max-width:880px){
+      .grid{grid-template-columns:1fr}
+      .preview{position:static}
+    }
+    @media (max-width:620px){
+      .app{width:min(100% - 14px,1100px);margin-top:10px}
+      .card{padding:14px;border-radius:14px}
+      .row,.row.three{grid-template-columns:1fr}
+      .summary{grid-template-columns:1fr}
+      .discount-line{grid-template-columns:1fr 1fr 42px}
+      .receipt{padding:16px}
+      .receipt-meta{grid-template-columns:1fr}
+      .topbar{display:block}
+      #signaturePad{height:190px}
+    }
+
+    @media print{
+      body{background:#fff}
+      .no-print,.form-card,.topbar{display:none!important}
+      .app{width:100%;margin:0}
+      .grid{display:block}
+      .preview{position:static}
+      .card.preview{border:0;box-shadow:none;padding:0}
+      .receipt{border:0;border-radius:0;min-height:auto;padding:0}
+      @page{size:A4;margin:14mm}
+    }
+  </style>
+
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="icon-192.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Comprovante Salário">
+
+</head>
+<body>
+  <div class="app">
+    <div class="topbar no-print">
+      <div>
+        <h1>Comprovante de Salário</h1>
+        <p class="subtitle">Preencha os dados, peça a assinatura na tela do celular e gere o comprovante.</p>
+      </div>
+
+      <button id="installAppBtn" class="btn-secondary" type="button" style="display:none;white-space:nowrap">
+        Instalar no celular
+      </button>
+    </div>
+
+    <div class="grid">
+      <section class="card form-card no-print">
+        <h2>Dados do recebimento</h2>
+
+        <div class="section-title">Empregador</div>
+        <div class="row">
+          <div class="field">
+            <label for="employer">Nome / Razão social *</label>
+            <input id="employer" placeholder="Ex.: Empresa Exemplo Ltda." />
+          </div>
+          <div class="field">
+            <label for="employerDoc">CNPJ / CPF</label>
+            <input id="employerDoc" placeholder="00.000.000/0000-00" />
+          </div>
+        </div>
+
+        <div class="section-title">Funcionário</div>
+        <div class="row">
+          <div class="field">
+            <label for="employee">Nome completo *</label>
+            <input id="employee" placeholder="Nome do funcionário" />
+          </div>
+          <div class="field">
+            <label for="employeeCpf">CPF</label>
+            <input id="employeeCpf" placeholder="000.000.000-00" />
+          </div>
+        </div>
+        <div class="row">
+          <div class="field">
+            <label for="role">Cargo / Função</label>
+            <input id="role" placeholder="Ex.: Auxiliar administrativo" />
+          </div>
+          <div class="field">
+            <label for="reference">Referência (mês/ano) *</label>
+            <input id="reference" type="month" />
+          </div>
+        </div>
+
+        <div class="section-title">Pagamento</div>
+        <div class="row">
+          <div class="field">
+            <label for="paymentDate">Data do recebimento *</label>
+            <input id="paymentDate" type="date" />
+          </div>
+          <div class="field">
+            <label for="gross">Salário / Valor bruto *</label>
+            <div class="money-wrap">
+              <span>R$</span>
+              <input id="gross" inputmode="decimal" placeholder="0,00" />
+            </div>
+          </div>
+        </div>
+
+        <div class="section-title">Descontos</div>
+        <div id="discounts" class="discounts"></div>
+        <button class="btn-secondary" type="button" id="addDiscount">+ Adicionar desconto</button>
+
+        <div class="summary">
+          <div class="summary-box">
+            <small>Valor bruto</small>
+            <strong id="sumGross">R$ 0,00</strong>
+          </div>
+          <div class="summary-box">
+            <small>Total descontos</small>
+            <strong id="sumDiscounts">R$ 0,00</strong>
+          </div>
+          <div class="summary-box net">
+            <small>Valor líquido</small>
+            <strong id="sumNet">R$ 0,00</strong>
+          </div>
+        </div>
+
+        <div class="section-title">Observações</div>
+        <div class="field">
+          <label for="notes">Observações opcionais</label>
+          <textarea id="notes" placeholder="Ex.: adiantamento, faltas, vale, ajuste, etc."></textarea>
+        </div>
+
+        <div class="section-title">Assinatura do funcionário</div>
+        <div class="signature-shell">
+          <canvas id="signaturePad"></canvas>
+        </div>
+        <div class="signature-actions">
+          <span class="hint">Assine com o dedo ou com o mouse.</span>
+          <button class="btn-ghost" type="button" id="clearSignature">Limpar assinatura</button>
+        </div>
+
+        <div id="status" class="status"></div>
+
+        <div class="actions">
+          <button class="btn-primary" type="button" id="printBtn">Gerar / Imprimir comprovante</button>
+          <button class="btn-ghost" type="button" id="saveBtn">Salvar dados neste aparelho</button>
+          <button class="btn-danger" type="button" id="resetBtn">Limpar tudo</button>
+        </div>
+        <p class="hint">O botão “Gerar / Imprimir” permite salvar como PDF usando a opção de impressão do celular ou computador.</p>
+      </section>
+
+      <section class="card preview">
+        <h2 class="no-print">Pré-visualização</h2>
+        <article class="receipt" id="receipt">
+          <div class="receipt-header">
+            <h3>Comprovante de Recebimento de Salário</h3>
+            <p id="pvEmployer" class="empty">Empregador não informado</p>
+            <p id="pvEmployerDoc"></p>
+          </div>
+
+          <div class="receipt-meta">
+            <div class="receipt-item">
+              <small>Funcionário</small>
+              <strong id="pvEmployee" class="empty">Não informado</strong>
+            </div>
+            <div class="receipt-item">
+              <small>CPF</small>
+              <strong id="pvEmployeeCpf" class="empty">Não informado</strong>
+            </div>
+            <div class="receipt-item">
+              <small>Cargo / Função</small>
+              <strong id="pvRole" class="empty">Não informado</strong>
+            </div>
+            <div class="receipt-item">
+              <small>Referência</small>
+              <strong id="pvReference" class="empty">Não informada</strong>
+            </div>
+            <div class="receipt-item">
+              <small>Data do recebimento</small>
+              <strong id="pvDate" class="empty">Não informada</strong>
+            </div>
+            <div class="receipt-item">
+              <small>Valor bruto</small>
+              <strong id="pvGross">R$ 0,00</strong>
+            </div>
+          </div>
+
+          <p class="statement" id="pvStatement">
+            Declaro, para os devidos fins, que recebi do empregador acima identificado a importância líquida discriminada neste comprovante, referente ao período informado.
+          </p>
+
+          <table class="receipt-table">
+            <thead>
+              <tr><th>Descrição dos descontos</th><th>Valor</th></tr>
+            </thead>
+            <tbody id="pvDiscounts">
+              <tr><td colspan="2" style="text-align:center;color:#94a3b8">Nenhum desconto informado</td></tr>
+            </tbody>
+          </table>
+
+          <div class="receipt-total">
+            <div class="receipt-total-box">
+              <span>Valor líquido</span>
+              <span id="pvNet">R$ 0,00</span>
+            </div>
+          </div>
+
+          <div class="receipt-item" id="notesBlock" style="display:none;margin-top:16px">
+            <small>Observações</small>
+            <strong id="pvNotes" style="font-weight:500;white-space:pre-line"></strong>
+          </div>
+
+          <div class="receipt-signature">
+            <img id="signatureImage" alt="" style="display:none" />
+            <div class="signature-line">
+              <strong id="signatureName">Assinatura do funcionário</strong><br/>
+              <span id="signatureCpf"></span>
+            </div>
+          </div>
+
+          <div class="receipt-footer">
+            Comprovante gerado eletronicamente a partir dos dados informados acima.
+          </div>
+        </article>
+      </section>
+    </div>
+  </div>
+
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const els = {
+    employer:$('employer'), employerDoc:$('employerDoc'),
+    employee:$('employee'), employeeCpf:$('employeeCpf'), role:$('role'),
+    reference:$('reference'), paymentDate:$('paymentDate'), gross:$('gross'),
+    notes:$('notes'), discounts:$('discounts'), status:$('status')
+  };
+
+  const currency = new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'});
+  let drawing = false;
+  let hasSignature = false;
+  const canvas = $('signaturePad');
+  const ctx = canvas.getContext('2d');
+
+  function parseMoney(v){
+    if(!v) return 0;
+    let s = String(v).trim().replace(/\s/g,'').replace(/R\$/gi,'');
+    if(s.includes(',')) s = s.replace(/\./g,'').replace(',','.');
+    return Number(s) || 0;
+  }
+  function formatInputMoney(input){
+    const val = parseMoney(input.value);
+    input.value = val ? val.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}) : '';
+  }
+  function formatDateBR(v){
+    if(!v) return '';
+    const [y,m,d]=v.split('-');
+    return `${d}/${m}/${y}`;
+  }
+  function formatReference(v){
+    if(!v) return '';
+    const [y,m]=v.split('-');
+    const months=['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
+    return `${months[Number(m)-1]}/${y}`;
+  }
+  function setPreview(id,text,emptyText='Não informado'){
+    const el=$(id);
+    if(text){
+      el.textContent=text;
+      el.classList.remove('empty');
+    } else {
+      el.textContent=emptyText;
+      el.classList.add('empty');
+    }
+  }
+
+  function addDiscount(desc='', value=''){
+    const row=document.createElement('div');
+    row.className='discount-line';
+    row.innerHTML=`
+      <div class="field">
+        <label>Descrição</label>
+        <input class="disc-desc" placeholder="Ex.: INSS, vale, falta..." value="${escapeHtml(desc)}">
+      </div>
+      <div class="field">
+        <label>Valor</label>
+        <div class="money-wrap">
+          <span>R$</span>
+          <input class="disc-value" inputmode="decimal" placeholder="0,00" value="${escapeHtml(value)}">
+        </div>
+      </div>
+      <button type="button" class="remove-btn" aria-label="Remover desconto">×</button>`;
+    row.querySelector('.remove-btn').addEventListener('click',()=>{row.remove(); update();});
+    row.querySelector('.disc-desc').addEventListener('input',update);
+    row.querySelector('.disc-value').addEventListener('input',update);
+    row.querySelector('.disc-value').addEventListener('blur',e=>{formatInputMoney(e.target);update();});
+    els.discounts.appendChild(row);
+    update();
+  }
+
+  function escapeHtml(s){
+    return String(s ?? '').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
+  }
+
+  function getDiscounts(){
+    return [...document.querySelectorAll('.discount-line')].map(row=>({
+      desc:row.querySelector('.disc-desc').value.trim(),
+      value:parseMoney(row.querySelector('.disc-value').value)
+    })).filter(x=>x.desc || x.value);
+  }
+
+  function update(){
+    const gross=parseMoney(els.gross.value);
+    const discounts=getDiscounts();
+    const totalDisc=discounts.reduce((a,b)=>a+b.value,0);
+    const net=gross-totalDisc;
+
+    $('sumGross').textContent=currency.format(gross);
+    $('sumDiscounts').textContent=currency.format(totalDisc);
+    $('sumNet').textContent=currency.format(net);
+
+    setPreview('pvEmployer', els.employer.value.trim(), 'Empregador não informado');
+    $('pvEmployerDoc').textContent=els.employerDoc.value.trim();
+    setPreview('pvEmployee', els.employee.value.trim());
+    setPreview('pvEmployeeCpf', els.employeeCpf.value.trim());
+    setPreview('pvRole', els.role.value.trim());
+    setPreview('pvReference', formatReference(els.reference.value), 'Não informada');
+    setPreview('pvDate', formatDateBR(els.paymentDate.value), 'Não informada');
+    $('pvGross').textContent=currency.format(gross);
+    $('pvNet').textContent=currency.format(net);
+
+    const tbody=$('pvDiscounts');
+    tbody.innerHTML='';
+    if(!discounts.length){
+      tbody.innerHTML='<tr><td colspan="2" style="text-align:center;color:#94a3b8">Nenhum desconto informado</td></tr>';
+    } else {
+      discounts.forEach(d=>{
+        const tr=document.createElement('tr');
+        const td1=document.createElement('td');
+        const td2=document.createElement('td');
+        td1.textContent=d.desc || 'Desconto';
+        td2.textContent=currency.format(d.value);
+        tr.append(td1,td2);
+        tbody.appendChild(tr);
+      });
+      const tr=document.createElement('tr');
+      tr.innerHTML=`<td><strong>Total de descontos</strong></td><td><strong>${currency.format(totalDisc)}</strong></td>`;
+      tbody.appendChild(tr);
+    }
+
+    const employee=els.employee.value.trim();
+    const ref=formatReference(els.reference.value);
+    $('pvStatement').textContent =
+      `Declaro, para os devidos fins, que ${employee ? 'eu, ' + employee + ', ' : ''}recebi do empregador acima identificado a importância líquida de ${currency.format(net)}${ref ? ', referente à competência ' + ref : ''}, conforme valores e descontos discriminados neste comprovante.`;
+
+    const notes=els.notes.value.trim();
+    $('notesBlock').style.display=notes?'block':'none';
+    $('pvNotes').textContent=notes;
+    $('signatureName').textContent=employee || 'Assinatura do funcionário';
+    $('signatureCpf').textContent=els.employeeCpf.value.trim() ? `CPF: ${els.employeeCpf.value.trim()}` : '';
+  }
+
+  function resizeCanvas(){
+    const rect=canvas.getBoundingClientRect();
+    const ratio=Math.max(window.devicePixelRatio||1,1);
+    const snapshot=hasSignature ? canvas.toDataURL() : null;
+    canvas.width=rect.width*ratio;
+    canvas.height=rect.height*ratio;
+    ctx.setTransform(ratio,0,0,ratio,0,0);
+    ctx.lineWidth=2.2;
+    ctx.lineCap='round';
+    ctx.lineJoin='round';
+    ctx.strokeStyle='#0f172a';
+    if(snapshot){
+      const img=new Image();
+      img.onload=()=>{
+        ctx.drawImage(img,0,0,rect.width,rect.height);
+        syncSignatureImage();
+      };
+      img.src=snapshot;
+    }
+  }
+  function point(e){
+    const r=canvas.getBoundingClientRect();
+    const t=e.touches?.[0] || e.changedTouches?.[0] || e;
+    return {x:t.clientX-r.left,y:t.clientY-r.top};
+  }
+  function start(e){
+    e.preventDefault();
+    drawing=true; hasSignature=true;
+    const p=point(e); ctx.beginPath(); ctx.moveTo(p.x,p.y);
+  }
+  function move(e){
+    if(!drawing) return;
+    e.preventDefault();
+    const p=point(e); ctx.lineTo(p.x,p.y); ctx.stroke();
+  }
+  function end(e){
+    if(!drawing) return;
+    e.preventDefault();
+    drawing=false; syncSignatureImage();
+  }
+  function clearSignature(){
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    hasSignature=false;
+    $('signatureImage').style.display='none';
+    $('signatureImage').removeAttribute('src');
+  }
+  function syncSignatureImage(){
+    if(!hasSignature) return;
+    $('signatureImage').src=canvas.toDataURL('image/png');
+    $('signatureImage').style.display='block';
+  }
+
+  function validate(){
+    const missing=[];
+    if(!els.employer.value.trim()) missing.push('empregador');
+    if(!els.employee.value.trim()) missing.push('funcionário');
+    if(!els.reference.value) missing.push('referência');
+    if(!els.paymentDate.value) missing.push('data do recebimento');
+    if(parseMoney(els.gross.value)<=0) missing.push('valor bruto');
+    if(!hasSignature) missing.push('assinatura');
+    if(missing.length){
+      showStatus('Preencha antes de gerar: '+missing.join(', ')+'.','err');
+      return false;
+    }
+    const net=parseMoney(els.gross.value)-getDiscounts().reduce((a,b)=>a+b.value,0);
+    if(net<0){
+      showStatus('O valor líquido ficou negativo. Revise os descontos.','err');
+      return false;
+    }
+    return true;
+  }
+  function showStatus(msg,type='ok'){
+    els.status.textContent=msg;
+    els.status.className=`status show ${type}`;
+    setTimeout(()=>els.status.classList.remove('show'),5000);
+  }
+
+  function saveLocal(){
+    const data={
+      employer:els.employer.value, employerDoc:els.employerDoc.value,
+      employee:els.employee.value, employeeCpf:els.employeeCpf.value, role:els.role.value,
+      reference:els.reference.value, paymentDate:els.paymentDate.value, gross:els.gross.value,
+      notes:els.notes.value, discounts:getDiscounts()
+    };
+    localStorage.setItem('salaryReceiptData',JSON.stringify(data));
+    showStatus('Dados salvos neste aparelho. A assinatura não é armazenada por segurança.','ok');
+  }
+  function loadLocal(){
+    try{
+      const raw=localStorage.getItem('salaryReceiptData');
+      if(!raw) return;
+      const d=JSON.parse(raw);
+      for(const k of ['employer','employerDoc','employee','employeeCpf','role','reference','paymentDate','gross','notes']){
+        if(d[k] != null && els[k]) els[k].value=d[k];
+      }
+      els.discounts.innerHTML='';
+      if(Array.isArray(d.discounts) && d.discounts.length){
+        d.discounts.forEach(x=>addDiscount(x.desc, x.value ? x.value.toLocaleString('pt-BR',{minimumFractionDigits:2}) : ''));
+      } else addDiscount();
+      update();
+    }catch(e){}
+  }
+
+  function resetAll(){
+    if(!confirm('Deseja limpar todos os dados do comprovante?')) return;
+    ['employer','employerDoc','employee','employeeCpf','role','reference','paymentDate','gross','notes'].forEach(k=>els[k].value='');
+    els.discounts.innerHTML='';
+    addDiscount();
+    clearSignature();
+    localStorage.removeItem('salaryReceiptData');
+    update();
+  }
+
+  Object.values(els).forEach(el=>{
+    if(el && el.addEventListener && el.id!=='discounts' && el.id!=='status'){
+      el.addEventListener('input',update);
+    }
+  });
+  els.gross.addEventListener('blur',()=>{formatInputMoney(els.gross);update();});
+  $('addDiscount').addEventListener('click',()=>addDiscount());
+  $('clearSignature').addEventListener('click',clearSignature);
+  $('saveBtn').addEventListener('click',saveLocal);
+  $('resetBtn').addEventListener('click',resetAll);
+  $('printBtn').addEventListener('click',()=>{
+    syncSignatureImage();
+    update();
+    if(!validate()) return;
+    window.print();
+  });
+
+  canvas.addEventListener('mousedown',start);
+  canvas.addEventListener('mousemove',move);
+  window.addEventListener('mouseup',end);
+  canvas.addEventListener('touchstart',start,{passive:false});
+  canvas.addEventListener('touchmove',move,{passive:false});
+  canvas.addEventListener('touchend',end,{passive:false});
+  window.addEventListener('resize',resizeCanvas);
+
+  // data padrão = hoje
+  const now=new Date();
+  if(!els.paymentDate.value){
+    const y=now.getFullYear(), m=String(now.getMonth()+1).padStart(2,'0'), d=String(now.getDate()).padStart(2,'0');
+    els.paymentDate.value=`${y}-${m}-${d}`;
+  }
+
+  loadLocal();
+  if(!els.discounts.children.length) addDiscount();
+  update();
+  requestAnimationFrame(resizeCanvas);
+
+  // PWA: instalação e funcionamento offline após o primeiro acesso via HTTPS
+  let deferredInstallPrompt = null;
+  const installBtn = document.getElementById('installAppBtn');
+
+  window.addEventListener('beforeinstallprompt', (event) => {
+    event.preventDefault();
+    deferredInstallPrompt = event;
+    if (installBtn) installBtn.style.display = 'inline-block';
+  });
+
+  if (installBtn) {
+    installBtn.addEventListener('click', async () => {
+      if (!deferredInstallPrompt) return;
+      deferredInstallPrompt.prompt();
+      await deferredInstallPrompt.userChoice;
+      deferredInstallPrompt = null;
+      installBtn.style.display = 'none';
+    });
+  }
+
+  window.addEventListener('appinstalled', () => {
+    deferredInstallPrompt = null;
+    if (installBtn) installBtn.style.display = 'none';
+  });
+
+  if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('./sw.js').catch(() => {});
+    });
+  }
+
+})();
+</script>
+</body>
+</html>
