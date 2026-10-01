@@ -276,6 +276,36 @@
     .receipt-attachments figure{margin:0 0 14px;text-align:center}
     .receipt-attachments img{max-width:100%;max-height:900px;border:1px solid #dfe6ef;border-radius:8px}
     .receipt-attachments figcaption{margin-top:4px;font-size:11px;color:var(--muted)}
+    .topbar-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+    .history-dialog{
+      width:min(720px,calc(100% - 20px));max-height:calc(100% - 20px);
+      border:0;border-radius:var(--radius);padding:0;box-shadow:var(--shadow);
+      color:var(--text);background:var(--card);
+    }
+    .history-dialog::backdrop{background:rgba(15,23,42,.45)}
+    .history-inner{display:flex;flex-direction:column;max-height:calc(100vh - 20px);padding:18px}
+    .history-head{display:flex;justify-content:space-between;align-items:center;gap:10px}
+    .history-head h2{margin:0;font-size:20px}
+    .history-search{margin:12px 0}
+    .history-list{overflow:auto;display:grid;gap:8px;min-height:80px}
+    .history-item{
+      display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+      border:1px solid var(--line);border-radius:12px;padding:10px 12px;background:#fbfdff;
+    }
+    .history-item .info{flex:1;min-width:180px}
+    .history-item .info strong{display:block}
+    .history-item .info small{color:var(--muted);font-size:12px}
+    .history-item .net{font-weight:800;color:var(--success);white-space:nowrap}
+    .history-item .btns{display:flex;gap:6px}
+    .history-item button{padding:8px 12px}
+    .history-empty{color:var(--muted);text-align:center;padding:24px 8px;font-size:14px}
+    .history-foot{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;padding-top:12px;border-top:1px solid var(--line)}
+    .history-foot .spacer{flex:1}
+    .editing-banner{
+      display:none;margin-bottom:12px;padding:10px 12px;border-radius:12px;
+      background:var(--soft);color:#16346e;font-size:13px;font-weight:600;
+    }
+    .editing-banner.show{display:block}
     .empty{color:#94a3b8;font-style:italic;font-weight:500!important}
     .status{
       margin-top:10px;
@@ -334,14 +364,18 @@
         <p class="subtitle">Preencha os dados, peça a assinatura na tela do celular e gere o comprovante.</p>
       </div>
 
-      <button id="installAppBtn" class="btn-secondary" type="button" style="display:none;white-space:nowrap">
-        Instalar no celular
-      </button>
+      <div class="topbar-actions">
+        <button id="historyBtn" class="btn-secondary" type="button" style="white-space:nowrap">Comprovantes anteriores</button>
+        <button id="installAppBtn" class="btn-secondary" type="button" style="display:none;white-space:nowrap">
+          Instalar no celular
+        </button>
+      </div>
     </div>
 
     <div class="grid">
       <section class="card form-card no-print">
         <h2>Dados do recebimento</h2>
+        <div class="editing-banner" id="editingBanner"></div>
 
         <div class="section-title">Empregador</div>
         <div class="row">
@@ -432,12 +466,12 @@
           <button class="btn-ghost" type="button" id="clearSignature">Limpar assinatura</button>
         </div>
 
-        <p class="hint" id="autosaveHint">Os dados e os anexos são salvos automaticamente neste aparelho. A assinatura não é salva.</p>
+        <p class="hint" id="autosaveHint">Os dados e os anexos são salvos automaticamente neste aparelho. Ao gerar, o comprovante completo (com assinatura) vai para “Comprovantes anteriores”.</p>
         <div id="status" class="status"></div>
 
         <div class="actions">
           <button class="btn-primary" type="button" id="printBtn">Gerar / Imprimir comprovante</button>
-          <button class="btn-danger" type="button" id="resetBtn">Limpar tudo</button>
+          <button class="btn-danger" type="button" id="resetBtn">Novo comprovante</button>
         </div>
         <p class="hint">O botão “Gerar / Imprimir” permite salvar como PDF usando a opção de impressão do celular ou computador.</p>
       </section>
@@ -523,6 +557,24 @@
       </section>
     </div>
   </div>
+
+  <dialog class="history-dialog no-print" id="historyDialog">
+    <div class="history-inner">
+      <div class="history-head">
+        <h2>Comprovantes anteriores</h2>
+        <button class="btn-ghost" type="button" id="historyClose">Fechar</button>
+      </div>
+      <input class="history-search" id="historySearch" type="search" placeholder="Buscar por nome, CPF ou mês..." />
+      <div class="history-list" id="historyList"></div>
+      <div class="history-foot">
+        <button class="btn-secondary" type="button" id="exportBtn">Exportar backup</button>
+        <button class="btn-secondary" type="button" id="importBtn">Importar backup</button>
+        <input id="importInput" type="file" accept="application/json,.json" style="display:none" />
+        <span class="spacer"></span>
+      </div>
+      <p class="hint" style="margin:8px 0 0">O histórico fica só neste aparelho. Exporte um backup de vez em quando e guarde o arquivo (Google Drive, e-mail, WhatsApp...).</p>
+    </div>
+  </dialog>
 
 <script>
 (() => {
@@ -749,22 +801,39 @@
     saveTimer=null;
     saveLocal();
   }
+  const FIELDS=['employer','employerDoc','employee','employeeCpf','role','reference','paymentDate','gross','notes'];
+  let currentHistoryId=null;
+  function getFormData(){
+    const data={};
+    FIELDS.forEach(k=>data[k]=els[k].value);
+    data.discounts=getDiscounts();
+    return data;
+  }
+  function applyFormData(d, keepDefaults){
+    for(const k of FIELDS){
+      if(d[k] != null && (!keepDefaults || d[k] !== '' || !els[k].defaultValue)) els[k].value=d[k];
+    }
+    els.discounts.innerHTML='';
+    if(Array.isArray(d.discounts) && d.discounts.length){
+      d.discounts.forEach(x=>addDiscount(x.desc, x.value ? x.value.toLocaleString('pt-BR',{minimumFractionDigits:2}) : ''));
+    } else addDiscount();
+  }
   function saveLocal(){
     saveTimer=null;
-    const data={
-      employer:els.employer.value, employerDoc:els.employerDoc.value,
-      employee:els.employee.value, employeeCpf:els.employeeCpf.value, role:els.role.value,
-      reference:els.reference.value, paymentDate:els.paymentDate.value, gross:els.gross.value,
-      notes:els.notes.value, discounts:getDiscounts()
-    };
+    const data=getFormData();
+    data.historyId=currentHistoryId;
     try{ localStorage.setItem('salaryReceiptData',JSON.stringify(data)); }catch(e){}
   }
 
   // Anexos ficam no IndexedDB (imagens podem passar do limite do localStorage)
   function openDb(){
     return new Promise((resolve,reject)=>{
-      const req=indexedDB.open('comprovanteSalario',1);
-      req.onupgradeneeded=()=>req.result.createObjectStore('kv');
+      const req=indexedDB.open('comprovanteSalario',2);
+      req.onupgradeneeded=()=>{
+        const db=req.result;
+        if(!db.objectStoreNames.contains('kv')) db.createObjectStore('kv');
+        if(!db.objectStoreNames.contains('history')) db.createObjectStore('history',{keyPath:'id'});
+      };
       req.onsuccess=()=>resolve(req.result);
       req.onerror=()=>reject(req.error);
     });
@@ -806,13 +875,8 @@
       const raw=localStorage.getItem('salaryReceiptData');
       if(!raw) return;
       const d=JSON.parse(raw);
-      for(const k of ['employer','employerDoc','employee','employeeCpf','role','reference','paymentDate','gross','notes']){
-        if(d[k] != null && els[k] && (d[k] !== '' || !els[k].defaultValue)) els[k].value=d[k];
-      }
-      els.discounts.innerHTML='';
-      if(Array.isArray(d.discounts) && d.discounts.length){
-        d.discounts.forEach(x=>addDiscount(x.desc, x.value ? x.value.toLocaleString('pt-BR',{minimumFractionDigits:2}) : ''));
-      } else addDiscount();
+      applyFormData(d,true);
+      currentHistoryId=d.historyId || null;
       update();
     }catch(e){}
   }
@@ -890,15 +954,188 @@
     renderAttachments();
   }
 
-  function resetAll(){
-    if(!confirm('Deseja limpar todos os dados do comprovante?')) return;
-    ['employer','employerDoc','employee','employeeCpf','role','reference','paymentDate','gross','notes'].forEach(k=>els[k].value=els[k].defaultValue);
+  function todayISO(){
+    const n=new Date();
+    return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}-${String(n.getDate()).padStart(2,'0')}`;
+  }
+  function clearForm(){
+    FIELDS.forEach(k=>els[k].value=els[k].defaultValue);
+    els.paymentDate.value=todayISO();
     els.discounts.innerHTML='';
     addDiscount();
     clearSignature();
     clearAttachments();
-    localStorage.removeItem('salaryReceiptData');
+    setCurrentHistoryId(null);
     update();
+  }
+  function resetAll(){
+    if(!confirm('Começar um novo comprovante? O formulário será limpo. Os comprovantes já gerados continuam em “Comprovantes anteriores”.')) return;
+    clearForm();
+  }
+
+  // ---------- Histórico de comprovantes ----------
+  function setCurrentHistoryId(id){
+    currentHistoryId=id;
+    const banner=$('editingBanner');
+    banner.textContent=id ? 'Você está vendo um comprovante do histórico. Se gerar de novo, ele será atualizado.' : '';
+    banner.classList.toggle('show',!!id);
+    scheduleSave();
+  }
+  function newId(){
+    return Date.now().toString(36)+Math.random().toString(36).slice(2,8);
+  }
+  async function historyAll(){
+    const db=await openDb();
+    const list=await new Promise((resolve,reject)=>{
+      const req=db.transaction('history').objectStore('history').getAll();
+      req.onsuccess=()=>resolve(req.result||[]);
+      req.onerror=()=>reject(req.error);
+    });
+    db.close();
+    return list.sort((a,b)=>(b.updatedAt||'').localeCompare(a.updatedAt||''));
+  }
+  async function historyPut(records){
+    const db=await openDb();
+    await new Promise((resolve,reject)=>{
+      const tx=db.transaction('history','readwrite');
+      records.forEach(r=>tx.objectStore('history').put(r));
+      tx.oncomplete=resolve;
+      tx.onerror=()=>reject(tx.error);
+    });
+    db.close();
+  }
+  async function historyDelete(id){
+    const db=await openDb();
+    await new Promise((resolve,reject)=>{
+      const tx=db.transaction('history','readwrite');
+      tx.objectStore('history').delete(id);
+      tx.oncomplete=resolve;
+      tx.onerror=()=>reject(tx.error);
+    });
+    db.close();
+  }
+  async function historyGet(id){
+    const db=await openDb();
+    const rec=await new Promise((resolve,reject)=>{
+      const req=db.transaction('history').objectStore('history').get(id);
+      req.onsuccess=()=>resolve(req.result);
+      req.onerror=()=>reject(req.error);
+    });
+    db.close();
+    return rec;
+  }
+  async function saveToHistory(){
+    const now=new Date().toISOString();
+    const id=currentHistoryId || newId();
+    let createdAt=now;
+    if(currentHistoryId){
+      const old=await historyGet(id).catch(()=>null);
+      if(old && old.createdAt) createdAt=old.createdAt;
+    }
+    const data=getFormData();
+    const net=parseMoney(data.gross)-data.discounts.reduce((a,b)=>a+b.value,0);
+    await historyPut([{
+      id, createdAt, updatedAt:now, data, net,
+      signature:hasSignature ? canvas.toDataURL('image/png') : null,
+      attachments:attachments.map(a=>({name:a.name,src:a.src}))
+    }]);
+    setCurrentHistoryId(id);
+  }
+  function loadSignature(src){
+    clearSignature();
+    if(!src) return;
+    const img=new Image();
+    img.onload=()=>{
+      const rect=canvas.getBoundingClientRect();
+      ctx.drawImage(img,0,0,rect.width,rect.height);
+      hasSignature=true;
+      syncSignatureImage();
+    };
+    img.src=src;
+  }
+  async function openFromHistory(id){
+    const rec=await historyGet(id);
+    if(!rec) return;
+    applyFormData(rec.data,false);
+    attachments=(rec.attachments||[]).map(a=>({name:a.name,src:a.src}));
+    renderAttachments();
+    loadSignature(rec.signature);
+    setCurrentHistoryId(rec.id);
+    update();
+    $('historyDialog').close();
+    window.scrollTo({top:0,behavior:'smooth'});
+    showStatus('Comprovante aberto. Use “Gerar / Imprimir” para imprimir ou salvar em PDF de novo.','ok');
+  }
+  let historyCache=[];
+  async function renderHistory(){
+    try{ historyCache=await historyAll(); }catch(e){ historyCache=[]; }
+    const q=$('historySearch').value.trim().toLowerCase();
+    const list=historyCache.filter(r=>{
+      if(!q) return true;
+      const d=r.data||{};
+      return [d.employee,d.employeeCpf,d.role,formatReference(d.reference),formatDateBR(d.paymentDate)]
+        .join(' ').toLowerCase().includes(q);
+    });
+    if(!historyCache.length){
+      $('historyList').innerHTML='<div class="history-empty">Nenhum comprovante gerado ainda.<br/>Eles aparecem aqui depois de usar “Gerar / Imprimir comprovante”.</div>';
+      return;
+    }
+    if(!list.length){
+      $('historyList').innerHTML='<div class="history-empty">Nenhum comprovante encontrado para essa busca.</div>';
+      return;
+    }
+    $('historyList').innerHTML=list.map(r=>{
+      const d=r.data||{};
+      const extras=[
+        formatReference(d.reference) ? 'Ref. '+formatReference(d.reference) : '',
+        formatDateBR(d.paymentDate) ? 'Pago em '+formatDateBR(d.paymentDate) : '',
+        (r.attachments&&r.attachments.length) ? `${r.attachments.length} anexo(s)` : ''
+      ].filter(Boolean).join(' · ');
+      return `
+        <div class="history-item">
+          <div class="info">
+            <strong>${escapeHtml(d.employee||'Sem nome')}</strong>
+            <small>${escapeHtml(extras)}</small>
+          </div>
+          <span class="net">${currency.format(r.net||0)}</span>
+          <div class="btns">
+            <button class="btn-primary" type="button" data-open="${escapeHtml(r.id)}">Abrir</button>
+            <button class="btn-danger" type="button" data-delete="${escapeHtml(r.id)}">Excluir</button>
+          </div>
+        </div>`;
+    }).join('');
+  }
+  async function exportBackup(){
+    const history=await historyAll();
+    if(!history.length){ alert('Não há comprovantes no histórico para exportar.'); return; }
+    const payload={app:'comprovante-salario',version:1,exportedAt:new Date().toISOString(),history};
+    const blob=new Blob([JSON.stringify(payload)],{type:'application/json'});
+    const name=`comprovantes-backup-${todayISO()}.json`;
+    const file=new File([blob],name,{type:'application/json'});
+    if(navigator.canShare && navigator.canShare({files:[file]}) && /Android|iPhone|iPad/i.test(navigator.userAgent)){
+      try{ await navigator.share({files:[file],title:name}); return; }catch(e){ if(e.name==='AbortError') return; }
+    }
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    a.href=url; a.download=name;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),2000);
+  }
+  async function importBackup(file){
+    try{
+      const payload=JSON.parse(await file.text());
+      const recs=Array.isArray(payload) ? payload : payload.history;
+      if(!Array.isArray(recs)) throw new Error('formato');
+      const valid=recs.filter(r=>r && typeof r.id==='string' && r.data && typeof r.data==='object');
+      if(!valid.length) throw new Error('vazio');
+      const existing=new Set((await historyAll()).map(r=>r.id));
+      const added=valid.filter(r=>!existing.has(r.id)).length;
+      await historyPut(valid);
+      await renderHistory();
+      alert(`Backup importado: ${added} comprovante(s) novo(s), ${valid.length-added} atualizado(s).`);
+    }catch(e){
+      alert('Não foi possível importar. Verifique se o arquivo é um backup gerado por este app.');
+    }
   }
 
   Object.values(els).forEach(el=>{
@@ -922,11 +1159,45 @@
     attachments.splice(Number(btn.dataset.remove),1);
     renderAttachments();
   });
-  $('printBtn').addEventListener('click',()=>{
+  $('printBtn').addEventListener('click',async()=>{
     syncSignatureImage();
     update();
     if(!validate()) return;
+    try{
+      await saveToHistory();
+      showStatus('Comprovante salvo em “Comprovantes anteriores”.','ok');
+    }catch(e){
+      showStatus('Não foi possível salvar no histórico (pouco espaço?). O comprovante ainda pode ser impresso.','err');
+    }
     window.print();
+  });
+  $('historyBtn').addEventListener('click',()=>{
+    $('historySearch').value='';
+    renderHistory();
+    $('historyDialog').showModal();
+  });
+  $('historyClose').addEventListener('click',()=>$('historyDialog').close());
+  $('historySearch').addEventListener('input',renderHistory);
+  $('historyList').addEventListener('click',async e=>{
+    const openBtn=e.target.closest('[data-open]');
+    const delBtn=e.target.closest('[data-delete]');
+    if(openBtn){
+      if(currentHistoryId!==openBtn.dataset.open && els.employee.value.trim() && !currentHistoryId &&
+         !confirm('O formulário atual ainda não foi gerado e será substituído. Continuar?')) return;
+      openFromHistory(openBtn.dataset.open);
+    }else if(delBtn){
+      if(!confirm('Excluir este comprovante do histórico? Isso não pode ser desfeito.')) return;
+      await historyDelete(delBtn.dataset.delete);
+      if(currentHistoryId===delBtn.dataset.delete) setCurrentHistoryId(null);
+      renderHistory();
+    }
+  });
+  $('exportBtn').addEventListener('click',exportBackup);
+  $('importBtn').addEventListener('click',()=>$('importInput').click());
+  $('importInput').addEventListener('change',e=>{
+    const f=e.target.files[0];
+    e.target.value='';
+    if(f) importBackup(f);
   });
 
   canvas.addEventListener('mousedown',start);
@@ -951,6 +1222,7 @@
   loadAttachments().finally(()=>{
     storageReady=true;
     renderAttachments();
+    setCurrentHistoryId(currentHistoryId);
   });
   window.addEventListener('pagehide',flushSave);
   document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='hidden') flushSave(); });

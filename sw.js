@@ -1,4 +1,4 @@
-const CACHE = 'comprovante-salario-v4';
+const CACHE = 'comprovante-salario-v5';
 const ASSETS = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png', './vendor/pdfjs/pdf.min.js', './vendor/pdfjs/pdf.worker.min.js'];
 
 self.addEventListener('install', event => {
