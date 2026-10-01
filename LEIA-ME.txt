@@ -10,6 +10,7 @@ Arquivos:
 - sw.js
 - icon-192.png
 - icon-512.png
+- vendor/pdfjs/ (leitura de PDF anexado, funciona offline)
 
 Depois do primeiro acesso pela internet, o app poderá continuar abrindo offline,
 desde que o navegador tenha concluído a instalação/cache.

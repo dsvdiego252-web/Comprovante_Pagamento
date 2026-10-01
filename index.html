@@ -263,6 +263,19 @@
       color:#94a3b8;
       text-align:center;
     }
+    .attach-input{display:none}
+    .attach-list{display:grid;gap:8px;margin:10px 0}
+    .attach-item{
+      display:flex;align-items:center;gap:10px;
+      padding:8px 10px;border:1px solid var(--line);border-radius:12px;background:#fbfdff;
+    }
+    .attach-item img{width:44px;height:44px;object-fit:cover;border-radius:8px;flex:none}
+    .attach-item span{flex:1;min-width:0;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .receipt-attachments{margin-top:28px;padding-top:16px;border-top:1px dashed #cbd5e1}
+    .receipt-attachments h3{margin:0 0 12px;font-size:14px;text-transform:uppercase;letter-spacing:.05em}
+    .receipt-attachments figure{margin:0 0 14px;text-align:center}
+    .receipt-attachments img{max-width:100%;max-height:900px;border:1px solid #dfe6ef;border-radius:8px}
+    .receipt-attachments figcaption{margin-top:4px;font-size:11px;color:var(--muted)}
     .empty{color:#94a3b8;font-style:italic;font-weight:500!important}
     .status{
       margin-top:10px;
@@ -299,6 +312,9 @@
       .preview{position:static}
       .card.preview{border:0;box-shadow:none;padding:0}
       .receipt{border:0;border-radius:0;min-height:auto;padding:0}
+      .receipt-attachments{break-before:page;border-top:0;margin-top:0;padding-top:0}
+      .receipt-attachments figure{break-inside:avoid}
+      .receipt-attachments img{max-height:250mm}
       @page{size:A4;margin:14mm}
     }
   </style>
@@ -401,6 +417,12 @@
           <textarea id="notes" placeholder="Ex.: adiantamento, faltas, vale, ajuste, etc."></textarea>
         </div>
 
+        <div class="section-title">Comprovante de pagamento (anexo)</div>
+        <input id="attachInput" class="attach-input" type="file" accept="image/*,application/pdf" multiple />
+        <div id="attachList" class="attach-list"></div>
+        <button class="btn-secondary" type="button" id="attachBtn">+ Anexar comprovante</button>
+        <p class="hint">Foto, print ou PDF do PIX/transferência. O anexo sai junto no comprovante impresso.</p>
+
         <div class="section-title">Assinatura do funcionário</div>
         <div class="signature-shell">
           <canvas id="signaturePad"></canvas>
@@ -487,6 +509,11 @@
               <strong id="signatureName">Assinatura do funcionário</strong><br/>
               <span id="signatureCpf"></span>
             </div>
+          </div>
+
+          <div class="receipt-attachments" id="pvAttachments" style="display:none">
+            <h3>Comprovante de pagamento anexo</h3>
+            <div id="pvAttachmentsList"></div>
           </div>
 
           <div class="receipt-footer">
@@ -734,12 +761,85 @@
     }catch(e){}
   }
 
+  let attachments=[];
+  let pdfjsPromise=null;
+  function loadPdfJs(){
+    if(!pdfjsPromise){
+      pdfjsPromise=new Promise((resolve,reject)=>{
+        const sc=document.createElement('script');
+        sc.src='vendor/pdfjs/pdf.min.js';
+        sc.onload=()=>{
+          window.pdfjsLib.GlobalWorkerOptions.workerSrc='vendor/pdfjs/pdf.worker.min.js';
+          resolve(window.pdfjsLib);
+        };
+        sc.onerror=()=>{pdfjsPromise=null;reject(new Error('pdf.js'));};
+        document.head.appendChild(sc);
+      });
+    }
+    return pdfjsPromise;
+  }
+  function readAsDataURL(file){
+    return new Promise((resolve,reject)=>{
+      const r=new FileReader();
+      r.onload=()=>resolve(r.result);
+      r.onerror=reject;
+      r.readAsDataURL(file);
+    });
+  }
+  async function pdfToImages(file){
+    const pdfjs=await loadPdfJs();
+    const pdf=await pdfjs.getDocument({data:await file.arrayBuffer()}).promise;
+    const pages=[];
+    for(let i=1;i<=pdf.numPages;i++){
+      const page=await pdf.getPage(i);
+      const viewport=page.getViewport({scale:2});
+      const c=document.createElement('canvas');
+      c.width=viewport.width;c.height=viewport.height;
+      await page.render({canvasContext:c.getContext('2d'),viewport}).promise;
+      pages.push(c.toDataURL('image/png'));
+    }
+    return pages;
+  }
+  async function addAttachments(files){
+    for(const file of files){
+      try{
+        if(file.type==='application/pdf'){
+          const pages=await pdfToImages(file);
+          pages.forEach((src,i)=>attachments.push({name:pages.length>1?`${file.name} (pág. ${i+1})`:file.name,src}));
+        }else if(file.type.startsWith('image/')){
+          attachments.push({name:file.name,src:await readAsDataURL(file)});
+        }else{
+          showStatus(`Formato não suportado: ${file.name}`,'err');
+        }
+      }catch(e){
+        showStatus(`Não foi possível ler ${file.name}. Tente enviar uma foto ou print.`,'err');
+      }
+    }
+    renderAttachments();
+  }
+  function renderAttachments(){
+    $('attachList').innerHTML=attachments.map((a,i)=>`
+      <div class="attach-item">
+        <img src="${a.src}" alt="" />
+        <span>${escapeHtml(a.name)}</span>
+        <button class="btn-ghost" type="button" data-remove="${i}">Remover</button>
+      </div>`).join('');
+    $('pvAttachmentsList').innerHTML=attachments.map(a=>`
+      <figure><img src="${a.src}" alt="" /><figcaption>${escapeHtml(a.name)}</figcaption></figure>`).join('');
+    $('pvAttachments').style.display=attachments.length?'block':'none';
+  }
+  function clearAttachments(){
+    attachments=[];
+    renderAttachments();
+  }
+
   function resetAll(){
     if(!confirm('Deseja limpar todos os dados do comprovante?')) return;
     ['employer','employerDoc','employee','employeeCpf','role','reference','paymentDate','gross','notes'].forEach(k=>els[k].value=els[k].defaultValue);
     els.discounts.innerHTML='';
     addDiscount();
     clearSignature();
+    clearAttachments();
     localStorage.removeItem('salaryReceiptData');
     update();
   }
@@ -754,6 +854,18 @@
   $('clearSignature').addEventListener('click',clearSignature);
   $('saveBtn').addEventListener('click',saveLocal);
   $('resetBtn').addEventListener('click',resetAll);
+  $('attachBtn').addEventListener('click',()=>$('attachInput').click());
+  $('attachInput').addEventListener('change',async e=>{
+    const files=[...e.target.files];
+    e.target.value='';
+    await addAttachments(files);
+  });
+  $('attachList').addEventListener('click',e=>{
+    const btn=e.target.closest('[data-remove]');
+    if(!btn) return;
+    attachments.splice(Number(btn.dataset.remove),1);
+    renderAttachments();
+  });
   $('printBtn').addEventListener('click',()=>{
     syncSignatureImage();
     update();
