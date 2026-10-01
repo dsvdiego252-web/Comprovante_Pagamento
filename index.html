@@ -432,11 +432,11 @@
           <button class="btn-ghost" type="button" id="clearSignature">Limpar assinatura</button>
         </div>
 
+        <p class="hint" id="autosaveHint">Os dados e os anexos são salvos automaticamente neste aparelho. A assinatura não é salva.</p>
         <div id="status" class="status"></div>
 
         <div class="actions">
           <button class="btn-primary" type="button" id="printBtn">Gerar / Imprimir comprovante</button>
-          <button class="btn-ghost" type="button" id="saveBtn">Salvar dados neste aparelho</button>
           <button class="btn-danger" type="button" id="resetBtn">Limpar tudo</button>
         </div>
         <p class="hint">O botão “Gerar / Imprimir” permite salvar como PDF usando a opção de impressão do celular ou computador.</p>
@@ -656,6 +656,7 @@
     $('pvNotes').textContent=notes;
     $('signatureName').textContent=employee || 'Assinatura do funcionário';
     $('signatureCpf').textContent=els.employeeCpf.value.trim() ? `CPF: ${els.employeeCpf.value.trim()}` : '';
+    scheduleSave();
   }
 
   function resizeCanvas(){
@@ -735,15 +736,70 @@
     setTimeout(()=>els.status.classList.remove('show'),5000);
   }
 
+  let storageReady=false;
+  let saveTimer=null;
+  function scheduleSave(){
+    if(!storageReady) return;
+    clearTimeout(saveTimer);
+    saveTimer=setTimeout(saveLocal,400);
+  }
+  function flushSave(){
+    if(!storageReady || !saveTimer) return;
+    clearTimeout(saveTimer);
+    saveTimer=null;
+    saveLocal();
+  }
   function saveLocal(){
+    saveTimer=null;
     const data={
       employer:els.employer.value, employerDoc:els.employerDoc.value,
       employee:els.employee.value, employeeCpf:els.employeeCpf.value, role:els.role.value,
       reference:els.reference.value, paymentDate:els.paymentDate.value, gross:els.gross.value,
       notes:els.notes.value, discounts:getDiscounts()
     };
-    localStorage.setItem('salaryReceiptData',JSON.stringify(data));
-    showStatus('Dados salvos neste aparelho. A assinatura não é armazenada por segurança.','ok');
+    try{ localStorage.setItem('salaryReceiptData',JSON.stringify(data)); }catch(e){}
+  }
+
+  // Anexos ficam no IndexedDB (imagens podem passar do limite do localStorage)
+  function openDb(){
+    return new Promise((resolve,reject)=>{
+      const req=indexedDB.open('comprovanteSalario',1);
+      req.onupgradeneeded=()=>req.result.createObjectStore('kv');
+      req.onsuccess=()=>resolve(req.result);
+      req.onerror=()=>reject(req.error);
+    });
+  }
+  async function dbSet(key,value){
+    const db=await openDb();
+    await new Promise((resolve,reject)=>{
+      const tx=db.transaction('kv','readwrite');
+      tx.objectStore('kv').put(value,key);
+      tx.oncomplete=resolve;
+      tx.onerror=()=>reject(tx.error);
+    });
+    db.close();
+  }
+  async function dbGet(key){
+    const db=await openDb();
+    const value=await new Promise((resolve,reject)=>{
+      const req=db.transaction('kv').objectStore('kv').get(key);
+      req.onsuccess=()=>resolve(req.result);
+      req.onerror=()=>reject(req.error);
+    });
+    db.close();
+    return value;
+  }
+  function saveAttachments(){
+    if(!storageReady) return;
+    dbSet('attachments',attachments).catch(()=>{
+      showStatus('Não foi possível salvar os anexos neste aparelho (pouco espaço?).','err');
+    });
+  }
+  async function loadAttachments(){
+    try{
+      const saved=await dbGet('attachments');
+      if(Array.isArray(saved)) attachments=saved.concat(attachments);
+    }catch(e){}
   }
   function loadLocal(){
     try{
@@ -827,6 +883,7 @@
     $('pvAttachmentsList').innerHTML=attachments.map(a=>`
       <figure><img src="${a.src}" alt="" /><figcaption>${escapeHtml(a.name)}</figcaption></figure>`).join('');
     $('pvAttachments').style.display=attachments.length?'block':'none';
+    saveAttachments();
   }
   function clearAttachments(){
     attachments=[];
@@ -852,7 +909,6 @@
   els.gross.addEventListener('blur',()=>{formatInputMoney(els.gross);update();});
   $('addDiscount').addEventListener('click',()=>addDiscount());
   $('clearSignature').addEventListener('click',clearSignature);
-  $('saveBtn').addEventListener('click',saveLocal);
   $('resetBtn').addEventListener('click',resetAll);
   $('attachBtn').addEventListener('click',()=>$('attachInput').click());
   $('attachInput').addEventListener('change',async e=>{
@@ -892,6 +948,12 @@
   if(!els.discounts.children.length) addDiscount();
   update();
   requestAnimationFrame(resizeCanvas);
+  loadAttachments().finally(()=>{
+    storageReady=true;
+    renderAttachments();
+  });
+  window.addEventListener('pagehide',flushSave);
+  document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='hidden') flushSave(); });
 
   // PWA: instalação e funcionamento offline após o primeiro acesso via HTTPS
   let deferredInstallPrompt = null;
